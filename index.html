@@ -23,6 +23,7 @@
                 margin: 0;
                 padding: 0;
                 border-left: 2px solid rgba(0, 0, 0, 0.15);
+                overflow: scroll;
             }
 
             #users > li {
@@ -98,7 +99,8 @@
                 list-style-type: none;
                 margin: 0;
                 padding: 0;
-
+                height: 100%;
+                overflow: scroll;
             }
 
             #messages > li {
@@ -151,18 +153,18 @@
         <p id="infos" class="hidden"></p>
 
         <form id="formLogin" action="#">
-            <input id="inputUsername" type="text" autocomplete="username" />
-            <input id="inputChannel" type="number" min="1" autocomplete="off" />
+            <input id="inputUsername" type="text" placeholder="Username" autocomplete="username" />
+            <input id="inputChannel" type="number" placeholder="Channel" min="1" autocomplete="off" />
             <button>Login</button>
         </form>
 
         <form id="formChangeChannel" class="hidden" action="#">
-            <input id="inputChangeChannel" type="number" min="1" autocomplete="off" />
+            <input id="inputChangeChannel" type="number" placeholder="Channel" min="1" autocomplete="off" />
             <button>Change</button>
         </form>
 
         <form id="formSendMessage" class="hidden" action="#">
-            <input id="inputSendMessage" type="text" autocomplete="off" />
+            <input id="inputSendMessage" placeholder="Type your message..." type="text" autocomplete="off" />
             <button>Send</button>
         </form>
 
@@ -191,10 +193,14 @@
                 let item = document.createElement('li');
                 item.textContent = addUsername ? username + ' : ' + msg : msg;
                 messages.appendChild(item);
-                window.scrollTo(0, document.body.scrollHeight);
+                messages.scrollTo(0, messages.scrollHeight);
             }
 
             var removeIsTyping = () => {
+                if (document.getElementById('typingText').length === 0) {
+                    return;
+                }
+
                 document.getElementById('typingText').remove();
                 infos.classList.add('hidden');
             }
@@ -260,7 +266,6 @@
                 item.textContent = username + ' is typing';
                 infos.appendChild(item);
                 infos.classList.remove('hidden');
-                window.scrollTo(0, document.body.scrollHeight);
 
                 setTimeout(removeIsTyping, 4000);
             });
