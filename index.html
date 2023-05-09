@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Socket.IO chat</title>
+        <style>
+            body {
+                margin: 0;
+                padding-bottom: 6rem;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            }
+
+            #formSendMessage,
+            #formLogin,
+            #formChangeChannel {
+                position: fixed;
+                z-index: 1;
+                display: flex;
+                justify-content: flex-end;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 3rem;
+                padding: 0.25rem;
+                background: rgba(0, 0, 0, 0.15);
+                box-sizing: border-box;
+                backdrop-filter: blur(10px);
+            }
+
+            #formLogin {
+                z-index: 2;
+            }
+
+            #formChangeChannel {
+                bottom: 3rem;
+            }
+
+            #inputSendMessage,
+            #inputUsername,
+            #inputChannel,
+            #inputChangeChannel {
+                flex-grow: 1;
+                margin: 0.25rem;
+                padding: 0 1rem;
+                border: none;
+                border-radius: 2rem;
+            }
+
+            #inputChannel,
+            #inputChangeChannel {
+                flex-grow: 0;
+            }
+
+            #inputSendMessage:focus,
+            #inputUsername:focus,
+            #inputChannel:focus,
+            #inputChangeChannel:focus {
+                outline: none;
+            }
+
+            #formSendMessage > button,
+            #formLogin > button,
+            #formChangeChannel > button {
+                margin: 0.25rem;
+                padding: 0 1rem;
+                border: none;
+                border-radius: 3px;
+                background: #333;
+                color: #fff;
+                outline: none;
+            }
+
+            #messages {
+                list-style-type: none;
+                margin: 0;
+                padding: 0;
+
+            }
+
+            #messages > li {
+                padding: 0.5rem 1rem;
+            }
+
+            #messages > li:nth-child(odd) {
+                background: #efefef;
+            }
+
+            #infos {
+                position: fixed;
+                z-index: 1;
+                display: flex;
+                bottom: 6rem;
+                left: 0;
+                right: 0;
+                width: 100%;
+                height: auto;
+                margin: 0;
+                padding: 0.5rem 1rem;
+                background: rgba(0, 0, 0, 0.15);
+                box-sizing: border-box;
+                backdrop-filter: blur(10px);
+                text-align: right;
+            }
+
+            #typingText {
+                display: block;
+                width: 100%;
+                text-align: right;
+                color:rgba(0, 0, 0, 0.35)
+            }
+
+            .hidden {
+                display: none;
+                visibility: hidden;
+                opacity: 0;
+            }
+        </style>
+    </head>
+
+    <body>
+        <ul id="messages"></ul>
+
+        <p id="infos" class="hidden"></p>
+
+        <form id="formLogin" action="#">
+            <input id="inputUsername" type="text" autocomplete="username" />
+            <input id="inputChannel" type="number" min="1" autocomplete="off" />
+            <button>Login</button>
+        </form>
+
+        <form id="formChangeChannel" class="hidden" action="#">
+            <input id="inputChangeChannel" type="number" min="1" autocomplete="off" />
+            <button>Change</button>
+        </form>
+
+        <form id="formSendMessage" class="hidden" action="#">
+            <input id="inputSendMessage" type="text" autocomplete="off" />
+            <button>Send</button>
+        </form>
+
+        <script src="/socket.io/socket.io.js"></script>
+
+        <script>
+            var socket = io();
+
+            var messages = document.getElementById('messages');
+            var infos = document.getElementById('infos');
+
+            var formMessage = document.getElementById('formSendMessage');
+            var inputMessage = document.getElementById('inputSendMessage');
+
+            var formLogin = document.getElementById('formLogin');
+            var inputUsername = document.getElementById('inputUsername');
+            var inputChannel = document.getElementById('inputChannel');
+
+            var formChangeChannel = document.getElementById('formChangeChannel');
+            var inputChangeChannel = document.getElementById('inputChangeChannel');
+
+            var username = '';
+
+            var users = [];
+
+            var addMessage = (msg, addUsername = false) => {
+                let item = document.createElement('li');
+                item.textContent = addUsername ? username + ' : ' + msg : msg;
+                messages.appendChild(item);
+                window.scrollTo(0, document.body.scrollHeight);
+                console.log(users);
+            }
+
+            var removeIsTyping = () => {
+                document.getElementById('typingText').remove();
+                infos.classList.add('hidden');
+            }
+
+            formLogin.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                if (inputUsername.value && inputChannel.value) {
+                    formLogin.classList.add('hidden');
+                    formMessage.classList.remove('hidden');
+                    formChangeChannel.classList.remove('hidden');
+                    username = inputUsername.value;
+                    socket.emit('joinChannel', { 'channel' : inputChannel.value, 'username' : inputUsername.value });
+                    addMessage('You joined channel ' + inputChannel.value + ' as ' + inputUsername.value);
+                }
+            });
+
+            formMessage.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                if (inputMessage.value) {
+                    socket.emit('sendMessage', inputMessage.value);
+                    addMessage(inputMessage.value, true)
+                    inputMessage.value = '';
+                }
+            });
+
+            formChangeChannel.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                if (inputChangeChannel.value) {
+                    socket.emit('changeChannel', inputChangeChannel.value);
+                    messages.innerHTML = '';
+                    addMessage('You switched to channel ' + inputChangeChannel.value);
+                    inputChangeChannel.value = '';
+                }
+            });
+
+            inputMessage.addEventListener('keypress', function (e) {
+                socket.emit('typing');
+            });
+
+            socket.on('receiveMessage', function(msg) {
+                addMessage(msg)
+                removeIsTyping()
+            });
+
+            socket.on('userJoin', function(data) {
+                users[data.id] = data.username;
+                addMessage(data.username + ' joined the game');
+            });
+
+            socket.on('userLeft', function(data) {
+                users.splice(data.id, 1);
+                addMessage(data.username + ' left the game');
+            });
+
+            socket.on('isTyping', function(username) {
+                let item = document.createElement('span');
+                item.id = 'typingText';
+                item.textContent = username + ' is typing';
+                infos.appendChild(item);
+                infos.classList.remove('hidden');
+                window.scrollTo(0, document.body.scrollHeight);
+
+                setTimeout(removeIsTyping, 4000);
+            });
+          </script>
+    </body>
+</html>
