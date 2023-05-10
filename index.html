@@ -5,15 +5,19 @@
         <style>
             body {
                 margin: 0;
-                padding-bottom: 6rem;
+                padding-bottom: 9rem;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                transform: translate3d(0, 0, 0);
+                backface-visibility: hidden;
+                perspective: 1000px;
             }
 
             #content {
                 display: flex;
                 flex-direction: row;
                 flex-wrap: nowrap;
-                height: calc(100vh - 6rem);
+                height: calc(100vh - 9rem);
+                border-bottom: 2px solid rgba(0, 0, 0, 0.15);
             }
 
             #users {
@@ -95,6 +99,7 @@
             }
 
             #messages {
+                position: relative;
                 flex-grow: 1;
                 list-style-type: none;
                 margin: 0;
@@ -119,7 +124,7 @@
                 left: 0;
                 right: 0;
                 width: 100%;
-                height: auto;
+                height: 3rem;
                 margin: 0;
                 padding: 0.5rem 1rem;
                 background: rgba(0, 0, 0, 0.15);
@@ -140,11 +145,33 @@
                 visibility: hidden;
                 opacity: 0;
             }
+
+            .wizz {
+                animation: wizz 0.2s linear infinite;
+            }
+
+            @keyframes wizz {
+                10%, 90% {
+                    transform: translate3d(-10px, 0, 0);
+                }
+
+                20%, 80% {
+                    transform: translate3d(10px, 0, 0);
+                }
+
+                30%, 50%, 70% {
+                    transform: translate3d(0, -10px, 0);
+                }
+
+                40%, 60% {
+                    transform: translate3d(0, 10px, 0);
+                }
+            }
         </style>
     </head>
 
     <body>
-        <div id="content">
+        <div id="content" class="hidden">
             <ul id="messages"></ul>
 
             <ul id="users" class="hidden"></ul>
@@ -160,7 +187,8 @@
 
         <form id="formChangeChannel" class="hidden" action="#">
             <input id="inputChangeChannel" type="number" placeholder="Channel" min="1" autocomplete="off" />
-            <button>Change</button>
+            <button type="submit">Change</button>
+            <button type="button" id="wizz">Wizz</button>
         </form>
 
         <form id="formSendMessage" class="hidden" action="#">
@@ -173,6 +201,7 @@
         <script>
             var socket = io();
 
+            var content = document.getElementById('content');
             var messages = document.getElementById('messages');
             var infos = document.getElementById('infos');
             var users = document.getElementById('users');
@@ -186,6 +215,8 @@
 
             var formChangeChannel = document.getElementById('formChangeChannel');
             var inputChangeChannel = document.getElementById('inputChangeChannel');
+
+            var wizz = document.getElementById('wizz');
 
             var username = '';
 
@@ -201,24 +232,15 @@
                     return;
                 }
 
+                document.title = 'Socket.IO chat';
                 document.getElementById('typingText').remove();
-                infos.classList.add('hidden');
             }
 
             formLogin.addEventListener('submit', function(e) {
                 e.preventDefault();
 
                 if (inputUsername.value && inputChannel.value) {
-                    formLogin.classList.add('hidden');
-                    formMessage.classList.remove('hidden');
-                    formChangeChannel.classList.remove('hidden');
-                    users.classList.remove('hidden');
-
-                    username = inputUsername.value;
-
                     socket.emit('joinChannel', { 'channel' : inputChannel.value, 'username' : inputUsername.value });
-
-                    addMessage('You joined channel ' + inputChannel.value + ' as ' + inputUsername.value);
                 }
             });
 
@@ -238,13 +260,65 @@
                 if (inputChangeChannel.value) {
                     socket.emit('changeChannel', inputChangeChannel.value);
                     messages.innerHTML = '';
-                    addMessage('You switched to channel ' + inputChangeChannel.value);
+                    addMessage('You\'re logged in channel ' + inputChangeChannel.value + ' as ' + username);
                     inputChangeChannel.value = '';
                 }
             });
 
             inputMessage.addEventListener('keypress', function (e) {
                 socket.emit('typing');
+            });
+
+            inputMessage.addEventListener('keydown', function (e) {
+                if (e.keyCode !== 38) {
+                    return;
+                }
+
+                socket.emit('getLastMessage');
+            });
+
+            wizz.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                socket.emit('sendWizz');
+            });
+
+            socket.on('wizz', function() {
+                document.body.classList.add('wizz');
+
+                setTimeout(function () {
+                    document.body.classList.remove('wizz');
+                }, 1000);
+            });
+
+            socket.on('lastMessageSent', function(msg) {
+                inputMessage.value = msg;
+            });
+
+            socket.on('connected', function () {
+                formLogin.classList.add('hidden');
+                formMessage.classList.remove('hidden');
+                formChangeChannel.classList.remove('hidden');
+                users.classList.remove('hidden');
+                content.classList.remove('hidden');
+                infos.classList.remove('hidden');
+
+                username = inputUsername.value;
+                addMessage('You\'re logged in channel ' + inputChannel.value + ' as ' + inputUsername.value);
+            });
+
+            socket.on('messagesHistory', function (data) {
+                if (data.messages === undefined) {
+                    return;
+                }
+
+                for (const key in data.messages) {
+                    addMessage(data.messages[key]);
+                }
+            });
+
+            socket.on('usernameAlreadyExist', function() {
+                alert('The username you tried to use is already taken, please use another one.');
             });
 
             socket.on('receiveMessage', function(msg) {
@@ -262,10 +336,11 @@
 
             socket.on('isTyping', function(username) {
                 let item = document.createElement('span');
+                let text = username + ' is typing';
                 item.id = 'typingText';
-                item.textContent = username + ' is typing';
+                item.textContent = text;
                 infos.appendChild(item);
-                infos.classList.remove('hidden');
+                document.title = text;
 
                 setTimeout(removeIsTyping, 4000);
             });
