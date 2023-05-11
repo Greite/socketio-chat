@@ -5,6 +5,10 @@ const server = http.createServer(app);
 const crypto = require('crypto');
 const { Server } = require('socket.io');
 const io = new Server(server);
+const readline = require('readline').createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
 
 var users = {};
 var messages = {};
@@ -155,6 +159,29 @@ io.on('connection', (socket) => {
     });
 });
 
+var readCommand = () => {
+    readline.question('', (prompt) => {
+        let fn = prompt.toString().trim();
+
+        if (fn in global && typeof global[fn] === 'function') {
+            global[fn]();
+        } else {
+            console.log('Command not found : ' + fn);
+            readCommand();
+        }
+    });
+}
+
+global.close = function close() {
+    console.log('Server closed');
+    io.emit('serverClosed');
+    io.disconnectSockets();
+    io.close();
+    readline.close();
+    server.close();
+}
+
 server.listen(3000, () => {
     console.log('Server listening on port 3000');
+    readCommand();
 });
