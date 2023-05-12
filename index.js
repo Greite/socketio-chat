@@ -298,6 +298,10 @@ global.banlist = () => {
     console.log(banList);
 }
 
+global.list = () => {
+    console.log(userList);
+}
+
 server.listen(3000, () => {
     console.log('Server listening on port 3000');
     readCommand();
