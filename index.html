@@ -117,6 +117,10 @@
                 background: #efefef;
             }
 
+            #messages > li.system {
+                background: rgba(255, 127, 80, 0.15);
+            }
+
             #infos {
                 position: fixed;
                 z-index: 1;
@@ -181,7 +185,7 @@
         <p id="infos" class="hidden"></p>
 
         <form id="formLogin" action="#">
-            <input id="inputUsername" type="text" placeholder="Username" autocomplete="username" />
+            <input id="inputUsername" type="text" placeholder="Username" autocomplete="off" />
             <input id="inputChannel" type="number" placeholder="Channel" min="1" autocomplete="off" />
             <button>Login</button>
         </form>
@@ -221,9 +225,14 @@
 
             var username = '';
 
-            var addMessage = (msg, addUsername = false) => {
+            var addMessage = (msg, addUsername = false, isSystem = false) => {
                 let item = document.createElement('li');
                 item.textContent = addUsername ? username + ' : ' + msg : msg;
+
+                if (isSystem) {
+                    item.classList.add('system');
+                }
+
                 messages.appendChild(item);
                 messages.scrollTo(0, messages.scrollHeight);
             }
@@ -313,6 +322,13 @@
                     return;
                 }
 
+                let firstChild = messages.firstElementChild;
+                messages.innerHTML = '';
+
+                if (firstChild !== undefined) {
+                    messages.append(firstChild);
+                }
+
                 for (const key in data.messages) {
                     addMessage(data.messages[key]);
                 }
@@ -320,6 +336,10 @@
 
             socket.on('usernameAlreadyExist', function() {
                 alert('The username you tried to use is already taken, please use another one.');
+            });
+
+            socket.on('usernameBanned', function() {
+                alert('You are banned from the server !');
             });
 
             socket.on('receiveMessage', function(msg) {
@@ -353,6 +373,40 @@
                     item.textContent = data.users[userID];
                     users.appendChild(item);
                 }
+            });
+
+            socket.on('kicked', function (username) {
+                alert('You are kicked from the server !');
+                location.reload();
+            });
+
+            socket.on('banned', function (username) {
+                alert('You are banned from the server !');
+                location.reload();
+            });
+
+            socket.on('systemBan', function (username) {
+                addMessage('User ' + username + ' banned from the server', false, true);
+            });
+
+            socket.on('serverCloseIn5', function () {
+                addMessage('Server will shutdown in 5 seconds', false, true);
+            });
+
+            socket.on('serverCloseIn4', function () {
+                addMessage('Server will shutdown in 4 seconds', false, true);
+            });
+
+            socket.on('serverCloseIn3', function () {
+                addMessage('Server will shutdown in 3 seconds', false, true);
+            });
+
+            socket.on('serverCloseIn2', function () {
+                addMessage('Server will shutdown in 2 seconds', false, true);
+            });
+
+            socket.on('serverCloseIn1', function () {
+                addMessage('Boom 💥', false, true);
             });
 
             socket.on('serverClosed', function () {

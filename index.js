@@ -12,6 +12,8 @@ const readline = require('readline').createInterface({
 
 var users = {};
 var messages = {};
+var banList = [];
+var userList = [];
 
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
@@ -74,6 +76,23 @@ io.on('connection', (socket) => {
         username = data.username;
         channel = data.channel;
         usernameAlreadyExist = false;
+        usernameBanned = false;
+
+        for (const bannedUserID in banList) {
+            console.log(bannedUserID, username);
+            if (banList[bannedUserID] !== username) {
+                continue;
+            }
+
+            usernameBanned = true;
+            break;
+        }
+
+        if (usernameBanned) {
+            console.log(username + ' trying to connect but is banned !');
+            io.to(socket.id).emit('usernameBanned');
+            return;
+        }
 
         for (const channel in users) {
             for (const userID in users[channel]) {
@@ -91,6 +110,8 @@ io.on('connection', (socket) => {
             io.to(socket.id).emit('usernameAlreadyExist');
             return;
         }
+
+        userList[username] = socket.id;
 
         console.log(username + ' joined channel ' + channel);
         socket.join(channel);
@@ -154,6 +175,7 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log('Client disconnected : ' + socket.id);
+        delete userList[username];
         sendUserLeft(channel, id, username);
         updateUsersList(channel, id, username, true);
     });
@@ -161,24 +183,119 @@ io.on('connection', (socket) => {
 
 var readCommand = () => {
     readline.question('', (prompt) => {
-        let fn = prompt.toString().trim();
+        readCommand();
+        let exploded = prompt.toString().trim().split(' ');
+        let fn = exploded[0];
+        exploded.shift();
+        let args = exploded;
 
         if (fn in global && typeof global[fn] === 'function') {
-            global[fn]();
+            global[fn](...args);
         } else {
             console.log('Command not found : ' + fn);
-            readCommand();
         }
     });
 }
 
-global.close = function close() {
-    console.log('Server closed');
-    io.emit('serverClosed');
-    io.disconnectSockets();
-    io.close();
-    readline.close();
-    server.close();
+global.close = () => {
+    setTimeout(() => {
+        console.log('Server will shutdown in 5 seconds');
+        io.emit('serverCloseIn5');
+    }, 1000);
+
+    setTimeout(() => {
+        console.log('Server will shutdown in 4 seconds');
+        io.emit('serverCloseIn4');
+    }, 2000);
+
+    setTimeout(() => {
+        console.log('Server will shutdown in 3 seconds');
+        io.emit('serverCloseIn3');
+    }, 3000);
+
+    setTimeout(() => {
+        console.log('Server will shutdown in 2 seconds');
+        io.emit('serverCloseIn2');
+    }, 4000);
+
+    setTimeout(() => {
+        console.log('Server will shutdown');
+        io.emit('serverCloseIn1');
+    }, 5000);
+
+    setTimeout(() => {
+        console.log('Server closed');
+        io.emit('serverClosed');
+        io.disconnectSockets();
+        io.close();
+        readline.close();
+        server.close();
+    }, 5500);
+}
+
+global.reset = (channel) => {
+    if (channel === undefined) {
+        console.log('Please specify a channel you want to reset');
+        return;
+    }
+
+    console.log('Reseting channel : ' + channel);
+    messages[channel] = [];
+    io.to(channel).emit('messagesHistory', { 'messages' : messages[channel] })
+}
+
+global.kick = (username) => {
+    if (username === undefined) {
+        console.log('Please specify the user you want to kick');
+        return;
+    }
+
+    console.log('User ' + username + ' kicked');
+
+    if (userList[username] !== undefined) {
+        io.to(userList[username]).emit('kicked');
+    } else {
+        console.log('User ' + username + ' not connected');
+    }
+}
+
+global.ban = (username) => {
+    if (username === undefined) {
+        console.log('Please specify the user you want to ban');
+        return;
+    }
+
+    if (banList.includes(username)) {
+        console.log('User ' + username + ' already banned');
+        return;
+    }
+
+    console.log('User ' + username + ' banned');
+    banList.push(username);
+    io.emit('systemBan', username);
+
+    if (userList[username] !== undefined) {
+        io.to(userList[username]).emit('banned');
+    }
+}
+
+global.unban = (username) => {
+    if (username === undefined) {
+        console.log('Please specify the user you want to unban');
+        return;
+    }
+
+    if (!banList.includes(username)) {
+        console.log('User ' + username + ' not banned');
+        return;
+    }
+
+    console.log('User ' + username + ' unbanned');
+    banList.pop(username);
+}
+
+global.banlist = () => {
+    console.log(banList);
 }
 
 server.listen(3000, () => {
