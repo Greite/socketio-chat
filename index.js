@@ -1,14 +1,28 @@
 const express = require('express');
 const app = express();
-const http = require('http');
-const server = http.createServer(app);
+const fs = require('fs');
+const configPath = 'config.json';
+const config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath)) : false;
+
+if (config) {
+    const options = {
+        key: fs.readFileSync(config.key),
+        cert: fs.readFileSync(config.crt)
+    };
+    const https = require('https');
+    var server = https.createServer(options, app);
+} else {
+    const http = require('http');
+    var server = http.createServer(app);
+}
+
 const crypto = require('crypto');
 const { Server } = require('socket.io');
 const io = new Server(server);
 const readline = require('readline').createInterface({
     input: process.stdin,
     output: process.stdout,
-  });
+});
 
 var users = {};
 var messages = {};
