@@ -19,6 +19,18 @@ app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
+var updateMessagesList = (channel, message) => {
+    if (!channel || !message) {
+        return;
+    }
+
+    if (messages[channel] === undefined) {
+        messages[channel] = [];
+    }
+
+    messages[channel].push(message);
+}
+
 io.on('connection', (socket) => {
     console.log('Client connected : ' + socket.id);
     var id = crypto.randomUUID();
@@ -55,21 +67,28 @@ io.on('connection', (socket) => {
         io.sockets.in(channel).emit('updateUsers', { 'users' : users[channel] });
     }
 
-    var updateMessagesList = (channel, message) => {
-        if (!channel || !message) {
-            return;
-        }
-
-        if (messages[channel] === undefined) {
-            messages[channel] = [];
-        }
-
-        messages[channel].push(message);
-    }
-
     var sendMessagesHistory = (channel) => {
         console.log('History of channel ' + channel + ' sent to ' + username);
         io.to(socket.id).emit('messagesHistory', { 'messages' : messages[channel] });
+    }
+
+    var execCommand = (prompt) => {
+        let exploded = prompt.toString().trim().split(' ');
+        let fn = exploded[0];
+        exploded.shift();
+        let args = exploded;
+
+        if (fn in global['front'] && typeof global['front'][fn] === 'function') {
+            console.log('Command runed : ' + fn);
+            global['front'][fn]({
+                'socket': socket,
+                'username': username,
+                'channel': channel,
+            }, ...args);
+        } else {
+            console.log('Command not found : ' + fn);
+            io.to(socket.id).emit('commandNotFound');
+        }
     }
 
     socket.on('joinChannel', (data) => {
@@ -140,11 +159,16 @@ io.on('connection', (socket) => {
     })
 
     socket.on('sendMessage', (message) => {
-        console.log('Message : ' + message);
-        socket.to(channel).emit('receiveMessage', username + ' : ' + message);
-        updateMessagesList(channel, username + ' : ' + message);
         lastMessage = message;
         typingTO = false;
+
+        if (message.charAt(0) === '/') {
+            execCommand(message.substring(1));
+        } else {
+            console.log('Message : ' + message);
+            socket.to(channel).emit('receiveMessage', username + ' : ' + message);
+            updateMessagesList(channel, username + ' : ' + message);
+        }
     });
 
     socket.on('typing', () => {
@@ -189,15 +213,18 @@ var readCommand = () => {
         exploded.shift();
         let args = exploded;
 
-        if (fn in global && typeof global[fn] === 'function') {
-            global[fn](...args);
+        if (fn in global['admin'] && typeof global['admin'][fn] === 'function') {
+            global['admin'][fn](...args);
         } else {
             console.log('Command not found : ' + fn);
         }
     });
 }
 
-global.close = () => {
+global.admin = [];
+global.front = [];
+
+global.admin.close = () => {
     setTimeout(() => {
         console.log('Server will shutdown in 5 seconds');
         io.emit('serverCloseIn5');
@@ -233,7 +260,7 @@ global.close = () => {
     }, 5500);
 }
 
-global.reset = (channel) => {
+global.admin.reset = (channel) => {
     if (channel === undefined) {
         console.log('Please specify a channel you want to reset');
         return;
@@ -244,7 +271,7 @@ global.reset = (channel) => {
     io.to(channel).emit('messagesHistory', { 'messages' : messages[channel] })
 }
 
-global.kick = (username) => {
+global.admin.kick = (username) => {
     if (username === undefined) {
         console.log('Please specify the user you want to kick');
         return;
@@ -259,7 +286,7 @@ global.kick = (username) => {
     }
 }
 
-global.ban = (username) => {
+global.admin.ban = (username) => {
     if (username === undefined) {
         console.log('Please specify the user you want to ban');
         return;
@@ -279,7 +306,7 @@ global.ban = (username) => {
     }
 }
 
-global.unban = (username) => {
+global.admin.unban = (username) => {
     if (username === undefined) {
         console.log('Please specify the user you want to unban');
         return;
@@ -294,12 +321,24 @@ global.unban = (username) => {
     banList.pop(username);
 }
 
-global.banlist = () => {
+global.admin.banlist = () => {
     console.log(banList);
 }
 
-global.list = () => {
+global.admin.list = () => {
     console.log(userList);
+}
+
+global.front.gif = (context, url) => {
+    if (url === undefined) {
+        io.sockets.to(context.socket.id).emit('commandError', 'Please specify the gif URL you want to display');
+        return;
+    }
+
+    let message = String.raw`${context.username} : <img src="${url}" />`
+
+    updateMessagesList(context.channel, '{{raw}}' + message);
+    io.sockets.to(context.channel).emit('receiveCommand', message);
 }
 
 server.listen(3000, () => {

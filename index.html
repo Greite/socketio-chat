@@ -113,6 +113,10 @@
                 padding: 0.5rem 1rem;
             }
 
+            #messages > li > * {
+                vertical-align: top;
+            }
+
             #messages > li:nth-child(odd) {
                 background: #efefef;
             }
@@ -225,9 +229,14 @@
 
             var username = '';
 
-            var addMessage = (msg, addUsername = false, isSystem = false) => {
+            var addMessage = (msg, addUsername = false, isSystem = false, raw = false) => {
                 let item = document.createElement('li');
-                item.textContent = addUsername ? username + ' : ' + msg : msg;
+
+                if (raw) {
+                    item.innerHTML = addUsername ? (username + ' : ' + (String.raw`${msg}`)) : String.raw`${msg}`;
+                } else {
+                    item.textContent = addUsername ? username + ' : ' + msg : msg;
+                }
 
                 if (isSystem) {
                     item.classList.add('system');
@@ -259,7 +268,11 @@
 
                 if (inputMessage.value) {
                     socket.emit('sendMessage', inputMessage.value);
-                    addMessage(inputMessage.value, true)
+
+                    if (inputMessage.value.charAt(0) !== '/') {
+                        addMessage(inputMessage.value, true)
+                    }
+
                     inputMessage.value = '';
                 }
             });
@@ -330,7 +343,11 @@
                 }
 
                 for (const key in data.messages) {
-                    addMessage(data.messages[key]);
+                    if (data.messages[key].indexOf('{{raw}}') === 0) {
+                        addMessage(data.messages[key].substr(7), false, false, true);
+                    } else {
+                        addMessage(data.messages[key]);
+                    }
                 }
             });
 
@@ -344,6 +361,16 @@
 
             socket.on('receiveMessage', function(msg) {
                 addMessage(msg)
+                removeIsTyping()
+            });
+
+            socket.on('receiveCommand', function(msg) {
+                addMessage(msg, false, false, true);
+                removeIsTyping()
+            });
+
+            socket.on('commandError', function(msg) {
+                addMessage(msg, false, true);
                 removeIsTyping()
             });
 
