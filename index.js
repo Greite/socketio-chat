@@ -6,8 +6,9 @@ const config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath
 
 if (config) {
     const options = {
-        key: fs.readFileSync(config.key),
-        cert: fs.readFileSync(config.crt)
+        key: config.key,
+        cert: config.crt,
+        ca: config.ca
     };
     const https = require('https');
     var server = https.createServer(options, app);
