@@ -255,6 +255,20 @@
                 document.getElementById('typingText').remove();
             }
 
+            var sendNotification = function(username) {
+                if (!("Notification" in window)) {
+                    console.log('This browser does not support desktop notification');
+                } else if (Notification.permission === "granted") {
+                    const notification = new Notification('New message from : ' + username);
+                } else if (Notification.permission !== "denied") {
+                    Notification.requestPermission().then((permission) => {
+                        if (permission === "granted") {
+                            const notification = new Notification('New message from : ' + username);
+                        }
+                    });
+                }
+            }
+
             formLogin.addEventListener('submit', function(e) {
                 e.preventDefault();
 
@@ -360,13 +374,17 @@
             });
 
             socket.on('receiveMessage', function(msg) {
+                let senderUsername = msg.split(' ')[0];
                 addMessage(msg)
                 removeIsTyping()
+                sendNotification(senderUsername)
             });
 
             socket.on('receiveCommand', function(msg) {
+                let senderUsername = msg.split(' ')[0];
                 addMessage(msg, false, false, true);
                 removeIsTyping()
+                sendNotification(senderUsername)
             });
 
             socket.on('commandError', function(msg) {
