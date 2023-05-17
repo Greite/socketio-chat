@@ -256,6 +256,10 @@
             }
 
             var sendNotification = function(username) {
+                if (!document.hidden) {
+                    return;
+                }
+
                 if (!("Notification" in window)) {
                     console.log('This browser does not support desktop notification');
                 } else if (Notification.permission === "granted") {
