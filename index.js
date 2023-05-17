@@ -2,13 +2,13 @@ const express = require('express');
 const app = express();
 const fs = require('fs');
 const configPath = 'config.json';
-const config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath)) : false;
+const config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : false;
 
 if (config) {
     const options = {
-        key: config.key,
-        cert: config.crt,
-        ca: config.ca
+        key: fs.readFileSync(config.key),
+        cert: fs.readFileSync(config.crt),
+        ca: fs.readFileSync(config.ca)
     };
     const https = require('https');
     var server = https.createServer(options, app);
