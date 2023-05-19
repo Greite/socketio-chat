@@ -102,7 +102,7 @@ io.on('connection', (socket) => {
             }, ...args);
         } else {
             console.log('Command not found : ' + fn);
-            io.to(socket.id).emit('commandNotFound');
+            io.to(socket.id).emit('commandNotFound', 'Command not found : ' + fn);
         }
     }
 

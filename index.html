@@ -396,6 +396,11 @@
                 removeIsTyping()
             });
 
+            socket.on('commandNotFound', function(msg) {
+                addMessage(msg, false, true);
+                removeIsTyping()
+            });
+
             socket.on('userJoin', function(data) {
                 addMessage(data.username + ' joined the game');
             });
