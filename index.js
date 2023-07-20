@@ -29,6 +29,7 @@ var users = {};
 var messages = {};
 var banList = [];
 var userList = [];
+var adminList = [];
 
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
@@ -44,6 +45,10 @@ var updateMessagesList = (channel, message) => {
     }
 
     messages[channel].push(message);
+}
+
+var isUserAdmin = (socketID) => {
+    return adminList.includes(socketID);
 }
 
 io.on('connection', (socket) => {
@@ -94,7 +99,7 @@ io.on('connection', (socket) => {
         let args = exploded;
 
         if (fn in global['front'] && typeof global['front'][fn] === 'function') {
-            console.log('Command runed : ' + fn);
+            console.log(username + ' runed : ' + fn);
             global['front'][fn]({
                 'socket': socket,
                 'username': username,
@@ -215,6 +220,7 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log('Client disconnected : ' + socket.id);
         delete userList[username];
+        delete adminList[socket.id];
         sendUserLeft(channel, id, username);
         updateUsersList(channel, id, username, true);
     });
@@ -344,6 +350,19 @@ global.admin.list = () => {
     console.log(userList);
 }
 
+global.admin.adminlist = () => {
+    console.log(adminList);
+}
+
+global.admin.say = (...args) => {
+    if (args === undefined) {
+        console.log('Please specify the message you want to send');
+        return;
+    }
+
+    io.emit('receiveMessage', 'Admin : ' + args.join(' '));
+}
+
 global.front.gif = (context, url) => {
     if (url === undefined) {
         io.sockets.to(context.socket.id).emit('commandError', 'Please specify the gif URL you want to display');
@@ -354,6 +373,73 @@ global.front.gif = (context, url) => {
 
     updateMessagesList(context.channel, '{{raw}}' + message);
     io.sockets.to(context.channel).emit('receiveCommand', message);
+}
+
+global.front.admin = (context, password) => {
+    if (password === undefined) {
+        io.sockets.to(context.socket.id).emit('commandError', 'Please specify the admin password');
+        return;
+    }
+
+    if (password !== config.adminPassword) {
+        io.sockets.to(context.socket.id).emit('commandError', 'Wrong admin password');
+        return;
+    }
+
+    adminList.push(context.socket.id);
+    io.sockets.to(context.socket.id).emit('adminConnected');
+}
+
+global.front.kick = (context, username) => {
+    if (!isUserAdmin(context.socket.id)) {
+        io.sockets.to(context.socket.id).emit('commandError', 'You are not admin');
+        return;
+    }
+
+    if (username === undefined) {
+        io.sockets.to(context.socket.id).emit('commandError', 'Please specify the user you want to kick');
+        return;
+    }
+
+    if (username === context.username) {
+        io.sockets.to(context.socket.id).emit('commandError', 'You can\'t kick yourself');
+        return;
+    }
+
+    if (userList[username] !== undefined) {
+        io.to(userList[username]).emit('kicked');
+    } else {
+        io.sockets.to(context.socket.id).emit('commandError', 'User ' + username + ' not connected');
+    }
+}
+
+global.front.ban = (context, username) => {
+    if (!isUserAdmin(context.socket.id)) {
+        io.sockets.to(context.socket.id).emit('commandError', 'You are not admin');
+        return;
+    }
+
+    if (username === undefined) {
+        io.sockets.to(context.socket.id).emit('commandError', 'Please specify the user you want to ban');
+        return;
+    }
+
+    if (username === context.username) {
+        io.sockets.to(context.socket.id).emit('commandError', 'You can\'t ban yourself');
+        return;
+    }
+
+    if (banList.includes(username)) {
+        io.sockets.to(context.socket.id).emit('commandError', 'User ' + username + ' already banned');
+        return;
+    }
+
+    banList.push(username);
+    io.emit('systemBan', username);
+
+    if (userList[username] !== undefined) {
+        io.to(userList[username]).emit('banned');
+    }
 }
 
 server.listen(3000, () => {

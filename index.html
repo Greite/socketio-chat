@@ -466,6 +466,10 @@
             socket.on('serverClosed', function () {
                 location.reload();
             });
+
+            socket.on('adminConnected', function () {
+                addMessage('Now logged as admin', false, true);
+            });
           </script>
     </body>
 </html>
