@@ -339,7 +339,7 @@ global.admin.unban = (username) => {
     }
 
     console.log('User ' + username + ' unbanned');
-    banList.pop(username);
+    delete banList[username];
 }
 
 global.admin.banlist = () => {
@@ -408,6 +408,7 @@ global.front.kick = (context, username) => {
 
     if (userList[username] !== undefined) {
         io.to(userList[username]).emit('kicked');
+        io.sockets.to(context.socket.id).emit('commandError', 'User ' + username + ' kicked');
     } else {
         io.sockets.to(context.socket.id).emit('commandError', 'User ' + username + ' not connected');
     }
@@ -440,6 +441,39 @@ global.front.ban = (context, username) => {
     if (userList[username] !== undefined) {
         io.to(userList[username]).emit('banned');
     }
+}
+
+global.front.unban = (context, username) => {
+    if (!isUserAdmin(context.socket.id)) {
+        io.sockets.to(context.socket.id).emit('commandError', 'You are not admin');
+        return;
+    }
+
+    if (username === undefined) {
+        io.sockets.to(context.socket.id).emit('commandError', 'Please specify the user you want to unban');
+        return;
+    }
+
+    if (!banList.includes(username)) {
+        io.sockets.to(context.socket.id).emit('commandError', 'User ' + username + ' not banned');
+        return;
+    }
+
+    delete banList[username];
+    io.sockets.to(context.socket.id).emit('commandError', 'User ' + username + ' unbanned');
+}
+
+global.front.banlist = (context) => {
+    if (!isUserAdmin(context.socket.id)) {
+        io.sockets.to(context.socket.id).emit('commandError', 'You are not admin');
+        return;
+    }
+
+    io.sockets.to(context.socket.id).emit('commandError', banList.join(', '));
+}
+
+global.front.help = (context) => {
+    io.sockets.to(context.socket.id).emit('commandError', 'Available commands : ' + Object.keys(global['front']).join(', '));
 }
 
 server.listen(3000, () => {
